@@ -102,8 +102,11 @@ void LocalMapping::Run()
         // Tracking will see that Local Mapping is busy
         SetAcceptKeyFrames(true);
 
-        if(CheckFinish())
+        if(CheckFinish() && !CheckNewKeyFrames())
+        {
+            cout<<"[LocalMapping] Finish Requested ! "<<endl;
             break;
+        }
 
         usleep(3000);
     }
@@ -697,7 +700,7 @@ void LocalMapping::KeyFrameCulling()
                 continue;
             }
             pKF->SetBadFlag();
-            cout<<"Cull Kf "<<pKF->mnId<<"( "<<pKF->mnFrameId<<" ) !"<<endl;
+            // cout<<"Cull Kf "<<pKF->mnId<<"( "<<pKF->mnFrameId<<" ) !"<<endl;
         }     
     }
 }

@@ -997,13 +997,19 @@ bool Tracking::NeedNewKeyFrame()
 
     // If Local Mapping is freezed by a Loop Closure do not insert keyframes
     if(mpLocalMapper->isStopped() || mpLocalMapper->stopRequested())
+    {
+        // cout<<"frame "<<mCurrentFrame.mnId<<", Local Mapping is freezed by a Loop Closure, no NeedKF"<<endl;
         return false;
+    }
 
     const int nKFs = mpMap->KeyFramesInMap();
 
     // Do not insert keyframes if not enough frames have passed from last relocalisation
     if(mCurrentFrame.mnId<mnLastRelocFrameId+mMaxFrames && nKFs>mMaxFrames)
+    {
+        // cout<<"frame "<<mCurrentFrame.mnId<<",  not enough frames have passed from last relocalisation"<<endl;
         return false;
+    }
 
     // Tracked MapPoints in the reference keyframe
     int nMinObs = 3;
@@ -1054,9 +1060,17 @@ bool Tracking::NeedNewKeyFrame()
     {
         // If the mapping accepts keyframes, insert keyframe.
         // Otherwise send a signal to interrupt BA
+        // if (mCurrentFrame.mnId==mseqlen-1) // 对于最后一帧 等lba 空闲
+        // {
+        //     while (!mpLocalMapper->AcceptKeyFrames())// 
+        //     {
+        //         usleep(100000); //单位 10e-6 秒  这里是  0.1s
+        //     }
+        // }
+        // bLocalMappingIdle = mpLocalMapper->AcceptKeyFrames();
         if(bLocalMappingIdle)
         {
-            cout<<"frame "<<mCurrentFrame.mnId<<", true NeedKF"<<endl;
+            // cout<<"frame "<<mCurrentFrame.mnId<<", true NeedKF"<<endl;
             return true;
         }
         else
@@ -1070,7 +1084,27 @@ bool Tracking::NeedNewKeyFrame()
                     return false;
             }
             else
-                return false;
+            {   
+                if (mCurrentFrame.mnId==mseqlen-1) // 对于最后一帧 等lba 空闲
+                {
+                    while (mpLocalMapper->KeyframesInQueue()>0)// 
+                    {
+                        usleep(100000); //单位 10e-6 秒  这里是  0.1s
+                    }
+                    if(true)
+                    {
+                        cout<<"end frame "<<mCurrentFrame.mnId<<", after wait, true NeedKF"<<endl;
+                        return true;
+                    } 
+                }
+                else
+                {
+                    // 原因在这里 单目下 最末帧还是被抛弃
+                    // cout<<"frame "<<mCurrentFrame.mnId<<", sent signal to interrupt BA, no needkf."<<endl;
+                    return false;
+                }
+            }
+                
         }
     }
     else

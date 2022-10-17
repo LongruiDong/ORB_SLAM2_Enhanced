@@ -347,6 +347,12 @@ void System::Reset()
 void System::Shutdown()
 {
     mpLocalMapper->RequestFinish();
+    //增添等待局部线程先终止，且回环线程没有待处理的关键帧 因为要保证最后一个kf走完loop closing的流程!
+    while(!mpLocalMapper->isFinished())// || mpLoopCloser->CheckNewKeyFrames())
+    {
+        usleep(5000);
+    }
+    cout<<"[System::Shutdown] LocalMap thread have stopped."<<endl;// and no newkf in LoopClose"<<endl;
     mpLoopCloser->RequestFinish();
     if(mpViewer)
     {

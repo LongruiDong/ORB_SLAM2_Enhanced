@@ -2,6 +2,8 @@ CMakeLists.txt.user
 Examples/Monocular/mono_euroc
 Examples/Monocular/mono_kitti
 Examples/Monocular/mono_tum
+Examples/Monocular/mono_replica
+Examples/Monocular/mono_replica_mapsl
 Examples/RGB-D/rgbd_tum
 Examples/ROS/ORB_SLAM2/CMakeLists.txt.user
 Examples/ROS/ORB_SLAM2/Mono
@@ -18,10 +20,12 @@ Thirdparty/g2o/build/
 Thirdparty/g2o/config.h
 Thirdparty/g2o/lib/
 Vocabulary/ORBvoc.txt
+Vocabulary/bin_vocabulary
 build/
 *~
 lib/
-
+# scripts
 dataset
-
+result
+result_mapsl
 

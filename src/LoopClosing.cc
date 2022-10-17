@@ -401,7 +401,7 @@ bool LoopClosing::ComputeSim3()
 
 void LoopClosing::CorrectLoop()
 {
-    cout << "Loop detected!" << endl;
+    cout << "Loop detected! Correct it at Kf "<<mpCurrentKF->mnId<<" ( "<<mpCurrentKF->mnFrameId << " )" << endl;
 
     // Send a stop signal to Local Mapping
     // Avoid new keyframes are inserted while correcting the loop

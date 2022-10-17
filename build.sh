@@ -27,12 +27,13 @@ echo "Configuring and building ORB_SLAM2 ..."
 
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DUSE_MAP_SAVE_LOAD=1
+cmake .. -DCMAKE_BUILD_TYPE=Release -DUSE_MAP_SAVE_LOAD=1 # 是否编译此功能
 make -j20
 
-cd ..
+# # 搞一次就行
+# cd ..
 
-cd Vocabulary
-echo "Converting vocabulary to binary version"
-./bin_vocabulary
-cd ..
+# cd Vocabulary
+# echo "Converting vocabulary to binary version"
+# ./bin_vocabulary
+# cd ..

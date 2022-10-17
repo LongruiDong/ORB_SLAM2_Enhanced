@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "*.log": "Log",
+        "*.out": "log",
+        "iostream": "cpp"
+    }
+}
