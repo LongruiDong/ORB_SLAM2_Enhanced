@@ -54,13 +54,8 @@ class Tracking
 {  
 
 public:
-#ifdef FUNC_MAP_SAVE_LOAD
-    Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Map* pMap,
-             KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, bool bReuseMap=false);
-#else
     Tracking(System* pSys, ORBVocabulary* pVoc, FrameDrawer* pFrameDrawer, MapDrawer* pMapDrawer, Map* pMap,
              KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor);
-#endif
 
     // Preprocess the input and call Track(). Extract features and performs stereo matching.
     cv::Mat GrabImageStereo(const cv::Mat &imRectLeft,const cv::Mat &imRectRight, const double &timestamp);
@@ -96,6 +91,7 @@ public:
 
     // Input sensor
     int mSensor;
+    int mseqlen; //增加序列总帧数
 
     // Current Frame
     Frame mCurrentFrame;

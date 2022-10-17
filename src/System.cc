@@ -26,23 +26,12 @@
 #include <pangolin/pangolin.h>
 #include <iomanip>
 
-static bool has_suffix(const std::string &str, const std::string &suffix)
-{
-    std::size_t index = str.find(suffix, str.size() - suffix.size());
-    return (index != std::string::npos);
-}
-
 namespace ORB_SLAM2
 {
-#ifdef FUNC_MAP_SAVE_LOAD
-System::System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
-               const bool bUseViewer, bool is_save_map_):mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false),mbActivateLocalizationMode(false),
-        mbDeactivateLocalizationMode(false), is_save_map(is_save_map_)
-#else
+
 System::System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
                const bool bUseViewer):mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false),mbActivateLocalizationMode(false),
         mbDeactivateLocalizationMode(false)
-#endif
 {
     // Output welcome message
     cout << endl <<
@@ -67,28 +56,13 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
        cerr << "Failed to open settings file at: " << strSettingsFile << endl;
        exit(-1);
     }
-#ifdef FUNC_MAP_SAVE_LOAD
-    cv::FileNode mapfilen = fsSettings["Map.mapfile"];
-    bool bReuseMap = false;
-    if (!mapfilen.empty())
-    {
-        mapfile = (string)mapfilen;
-    }
-#endif
+
 
     //Load ORB Vocabulary
     cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
 
     mpVocabulary = new ORBVocabulary();
-    bool bVocLoad = false; // chose loading method based on file extension
-
-    if (has_suffix(strVocFile, ".bin"))
-        bVocLoad = mpVocabulary->loadFromBinaryFile(strVocFile);
-    else if(has_suffix(strVocFile, ".txt"))
-        bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
-    else
-        bVocLoad = false;
-
+    bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
     if(!bVocLoad)
     {
         cerr << "Wrong path to vocabulary. " << endl;
@@ -97,37 +71,20 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     }
     cout << "Vocabulary loaded!" << endl << endl;
 
-
     //Create KeyFrame Database
+    mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
+
     //Create the Map
-#ifdef FUNC_MAP_SAVE_LOAD
-    if (!mapfile.empty() && LoadMap(mapfile))
-    {
-        bReuseMap = true;
-    }
-    else
-#endif
-    {
-        mpKeyFrameDatabase = new KeyFrameDatabase(mpVocabulary);
-        mpMap = new Map();
-    }
+    mpMap = new Map();
 
     //Create Drawers. These are used by the Viewer
-#ifdef FUNC_MAP_SAVE_LOAD
-    mpFrameDrawer = new FrameDrawer(mpMap, bReuseMap);
-#else
     mpFrameDrawer = new FrameDrawer(mpMap);
-#endif
     mpMapDrawer = new MapDrawer(mpMap, strSettingsFile);
 
     //Initialize the Tracking thread
     //(it will live in the main thread of execution, the one that called this constructor)
     mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
-#ifdef FUNC_MAP_SAVE_LOAD
-                             mpMap, mpKeyFrameDatabase, strSettingsFile, mSensor, bReuseMap);
-#else
                              mpMap, mpKeyFrameDatabase, strSettingsFile, mSensor);
-#endif
 
     //Initialize the Local Mapping thread and launch
     mpLocalMapper = new LocalMapping(mpMap, mSensor==MONOCULAR);
@@ -140,11 +97,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     //Initialize the Viewer thread and launch
     if(bUseViewer)
     {
-#ifdef FUNC_MAP_SAVE_LOAD
-        mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpTracker,strSettingsFile, bReuseMap);
-#else
         mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpTracker,strSettingsFile);
-#endif
         mptViewer = new thread(&Viewer::Run, mpViewer);
         mpTracker->SetViewer(mpViewer);
     }
@@ -166,7 +119,7 @@ cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const
     {
         cerr << "ERROR: you called TrackStereo but input sensor was not set to STEREO." << endl;
         exit(-1);
-    }
+    }   
 
     // Check mode change
     {
@@ -178,7 +131,7 @@ cv::Mat System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const
             // Wait until Local Mapping has effectively stopped
             while(!mpLocalMapper->isStopped())
             {
-                std::this_thread::sleep_for(std::chrono::microseconds(1000));
+                usleep(1000);
             }
 
             mpTracker->InformOnlyTracking(true);
@@ -217,7 +170,7 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
     {
         cerr << "ERROR: you called TrackRGBD but input sensor was not set to RGBD." << endl;
         exit(-1);
-    }
+    }    
 
     // Check mode change
     {
@@ -229,7 +182,7 @@ cv::Mat System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const doub
             // Wait until Local Mapping has effectively stopped
             while(!mpLocalMapper->isStopped())
             {
-                std::this_thread::sleep_for(std::chrono::microseconds(1000));
+                usleep(1000);
             }
 
             mpTracker->InformOnlyTracking(true);
@@ -280,7 +233,7 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
             // Wait until Local Mapping has effectively stopped
             while(!mpLocalMapper->isStopped())
             {
-                std::this_thread::sleep_for(std::chrono::microseconds(1000));
+                usleep(1000);
             }
 
             mpTracker->InformOnlyTracking(true);
@@ -353,22 +306,17 @@ void System::Shutdown()
     {
         mpViewer->RequestFinish();
         while(!mpViewer->isFinished())
-        {
-            std::this_thread::sleep_for(std::chrono::microseconds(5000));
-        }
+            usleep(5000);
     }
 
     // Wait until all thread have effectively stopped
     while(!mpLocalMapper->isFinished() || !mpLoopCloser->isFinished() || mpLoopCloser->isRunningGBA())
     {
-        std::this_thread::sleep_for(std::chrono::microseconds(5000));
+        usleep(5000);
     }
+
     if(mpViewer)
         pangolin::BindToContext("ORB-SLAM2: Map Viewer");
-#ifdef FUNC_MAP_SAVE_LOAD
-    if (is_save_map)
-        SaveMap(mapfile);
-#endif
 }
 
 void System::SaveTrajectoryTUM(const string &filename)
@@ -379,6 +327,66 @@ void System::SaveTrajectoryTUM(const string &filename)
         cerr << "ERROR: SaveTrajectoryTUM cannot be used for monocular." << endl;
         return;
     }
+
+    vector<KeyFrame*> vpKFs = mpMap->GetAllKeyFrames();
+    sort(vpKFs.begin(),vpKFs.end(),KeyFrame::lId);
+
+    // Transform all keyframes so that the first keyframe is at the origin.
+    // After a loop closure the first keyframe might not be at the origin.
+    cv::Mat Two = vpKFs[0]->GetPoseInverse();
+
+    ofstream f;
+    f.open(filename.c_str());
+    f << fixed;
+
+    // Frame pose is stored relative to its reference keyframe (which is optimized by BA and pose graph).
+    // We need to get first the keyframe pose and then concatenate the relative transformation.
+    // Frames not localized (tracking failure) are not saved.
+
+    // For each frame we have a reference keyframe (lRit), the timestamp (lT) and a flag
+    // which is true when tracking failed (lbL).
+    list<ORB_SLAM2::KeyFrame*>::iterator lRit = mpTracker->mlpReferences.begin();
+    list<double>::iterator lT = mpTracker->mlFrameTimes.begin();
+    list<bool>::iterator lbL = mpTracker->mlbLost.begin();
+    for(list<cv::Mat>::iterator lit=mpTracker->mlRelativeFramePoses.begin(),
+        lend=mpTracker->mlRelativeFramePoses.end();lit!=lend;lit++, lRit++, lT++, lbL++)
+    {
+        if(*lbL)
+            continue;
+
+        KeyFrame* pKF = *lRit;
+
+        cv::Mat Trw = cv::Mat::eye(4,4,CV_32F);
+
+        // If the reference keyframe was culled, traverse the spanning tree to get a suitable keyframe.
+        while(pKF->isBad())
+        {
+            Trw = Trw*pKF->mTcp;
+            pKF = pKF->GetParent();
+        }
+
+        Trw = Trw*pKF->GetPose()*Two;
+
+        cv::Mat Tcw = (*lit)*Trw;
+        cv::Mat Rwc = Tcw.rowRange(0,3).colRange(0,3).t();
+        cv::Mat twc = -Rwc*Tcw.rowRange(0,3).col(3);
+
+        vector<float> q = Converter::toQuaternion(Rwc);
+
+        f << setprecision(6) << *lT << " " <<  setprecision(9) << twc.at<float>(0) << " " << twc.at<float>(1) << " " << twc.at<float>(2) << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << endl;
+    }
+    f.close();
+    cout << endl << "trajectory saved!" << endl;
+}
+
+void System::SaveTrajectoryMonoTUM(const string &filename)
+{
+    cout << endl << "Saving camera trajectory to " << filename << " ..." << endl;
+    // if(mSensor==MONOCULAR)
+    // {
+    //     cerr << "ERROR: SaveTrajectoryTUM cannot be used for monocular." << endl;
+    //     return;
+    // }
 
     vector<KeyFrame*> vpKFs = mpMap->GetAllKeyFrames();
     sort(vpKFs.begin(),vpKFs.end(),KeyFrame::lId);
@@ -458,7 +466,7 @@ void System::SaveKeyFrameTrajectoryTUM(const string &filename)
 
         cv::Mat R = pKF->GetRotation().t();
         vector<float> q = Converter::toQuaternion(R);
-        cv::Mat t = pKF->GetCameraCenter();
+        cv::Mat t = pKF->GetCameraCenter(); // time x y z i j k w 注意格式
         f << setprecision(6) << pKF->mTimeStamp << setprecision(7) << " " << t.at<float>(0) << " " << t.at<float>(1) << " " << t.at<float>(2)
           << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << endl;
 
@@ -541,46 +549,34 @@ vector<cv::KeyPoint> System::GetTrackedKeyPointsUn()
     return mTrackedKeyPointsUn;
 }
 
-#ifdef FUNC_MAP_SAVE_LOAD
-void System::SaveMap(const string &filename)
+// https://github.com/raulmur/ORB_SLAM2/issues/526#issue-298887338
+// https://github.com/raulmur/ORB_SLAM/issues/5#issuecomment-181451584
+// 保存重建的稀疏点云 先就是简单的 txt 吧
+void System::SaveMapPoints(const string &filename)
 {
-    std::ofstream out(filename, std::ios_base::binary);
-    if (!out)
-    {
-        cerr << "Cannot Write to Mapfile: " << mapfile << std::endl;
-        exit(-1);
+    cout << endl << "Saving map points to " << filename << " ..." << endl;
+    vector<MapPoint*> vpMPs = mpMap->GetAllMapPoints();
+
+    // Transform all keyframes so that the first keyframe is at the origin.
+    // After a loop closure the first keyframe might not be at the origin.
+    ofstream f;
+    f.open(filename.c_str());
+    f << fixed;
+
+    for(size_t i=0; i<vpMPs.size(); i++) {
+        MapPoint* pMP = vpMPs[i];
+
+        if(pMP->isBad())
+            continue;
+
+        cv::Mat MPPositions = pMP->GetWorldPos();
+
+        f << setprecision(7) << " " << MPPositions.at<float>(0) << " " << MPPositions.at<float>(1) << " " << MPPositions.at<float>(2) << endl;
     }
-    cout << "Saving Mapfile: " << mapfile << std::flush;
-    boost::archive::binary_oarchive oa(out, boost::archive::no_header);
-    oa << mpMap;
-    oa << mpKeyFrameDatabase;
-    cout << " ...done" << std::endl;
-    out.close();
-}
-bool System::LoadMap(const string &filename)
-{
-    std::ifstream in(filename, std::ios_base::binary);
-    if (!in)
-    {
-        cerr << "Cannot Open Mapfile: " << mapfile << " , Create a new one" << std::endl;
-        return false;
-    }
-    cout << "Loading Mapfile: " << mapfile << std::flush;
-    boost::archive::binary_iarchive ia(in, boost::archive::no_header);
-    ia >> mpMap;
-    ia >> mpKeyFrameDatabase;
-    mpKeyFrameDatabase->SetORBvocabulary(mpVocabulary);
-    cout << " ...done" << std::endl;
-    cout << "Map Reconstructing" << flush;
-    vector<ORB_SLAM2::KeyFrame*> vpKFS = mpMap->GetAllKeyFrames();
-    for (auto it:vpKFS) {
-        it->SetORBvocabulary(mpVocabulary);
-        it->ComputeBoW();
-    }
-    cout << " ...done" << endl;
-    in.close();
-    return true;
+
+    f.close();
+    cout << endl << "Map Points saved! (txt)" << endl;
+
 }
 
-#endif
 } //namespace ORB_SLAM

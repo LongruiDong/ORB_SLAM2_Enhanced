@@ -148,4 +148,16 @@ std::vector<float> Converter::toQuaternion(const cv::Mat &M)
     return v;
 }
 
+cv::Mat Converter::InverseMat(const cv::Mat &cvT)
+{
+    cv::Mat cvMat = cv::Mat::eye(4,4,CV_32F);
+
+    cv::Mat Rinv = cvT.rowRange(0,3).colRange(0,3).t();
+    cv::Mat tinv = -Rinv * cvT.rowRange(0,3).col(3);
+    Rinv.copyTo(cvMat.rowRange(0,3).colRange(0,3));
+    tinv.copyTo(cvMat.rowRange(0,3).col(3));
+
+    return cvMat.clone();
+}
+
 } //namespace ORB_SLAM

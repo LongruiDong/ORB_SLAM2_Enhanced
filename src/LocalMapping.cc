@@ -91,7 +91,7 @@ void LocalMapping::Run()
             // Safe area to stop
             while(isStopped() && !CheckFinish())
             {
-                std::this_thread::sleep_for(std::chrono::microseconds(3000));
+                usleep(3000);
             }
             if(CheckFinish())
                 break;
@@ -105,7 +105,7 @@ void LocalMapping::Run()
         if(CheckFinish())
             break;
 
-        std::this_thread::sleep_for(std::chrono::microseconds(3000));
+        usleep(3000);
     }
 
     SetFinish();
@@ -691,7 +691,14 @@ void LocalMapping::KeyFrameCulling()
         }  
 
         if(nRedundantObservations>0.9*nMPs)
+        {
+            if(int(pKF->mnFrameId)==mpTracker->mseqlen-1)
+            {//最末帧也不删除
+                continue;
+            }
             pKF->SetBadFlag();
+            cout<<"Cull Kf "<<pKF->mnId<<"( "<<pKF->mnFrameId<<" ) !"<<endl;
+        }     
     }
 }
 
@@ -716,7 +723,7 @@ void LocalMapping::RequestReset()
             if(!mbResetRequested)
                 break;
         }
-        std::this_thread::sleep_for(std::chrono::microseconds(3000));
+        usleep(3000);
     }
 }
 

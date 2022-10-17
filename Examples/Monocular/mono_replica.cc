@@ -23,29 +23,30 @@
 #include<algorithm>
 #include<fstream>
 #include<chrono>
+#include<iomanip>
 
 #include<opencv2/core/core.hpp>
 
-#include<System.h>
+#include"System.h"
+#include <include/Converter.h>//用来进行数据转换
 
 using namespace std;
 
-void LoadImages(const string &strFile, vector<string> &vstrImageFilenames,
+void LoadImages(const string &strSequence, vector<string> &vstrImageFilenames,
                 vector<double> &vTimestamps);
 
 int main(int argc, char **argv)
 {
     if(argc != 4)
-    {
-        cerr << endl << "Usage: ./mono_tum path_to_vocabulary path_to_settings path_to_sequence" << endl;
+    {   // ./mono_replica Vocabulary/ORBvoc.txt Examples/Monocular/Replica.yaml dataset/Replica/office0
+        cerr << endl << "Usage: ./mono_replica path_to_vocabulary path_to_settings path_to_sequence" << endl;
         return 1;
     }
 
     // Retrieve paths to images
     vector<string> vstrImageFilenames;
     vector<double> vTimestamps;
-    string strFile = string(argv[3])+"/rgb.txt";
-    LoadImages(strFile, vstrImageFilenames, vTimestamps);
+    LoadImages(string(argv[3]), vstrImageFilenames, vTimestamps);
 
     int nImages = vstrImageFilenames.size();
 
@@ -59,19 +60,21 @@ int main(int argc, char **argv)
     cout << endl << "-------" << endl;
     cout << "Start processing sequence ..." << endl;
     cout << "Images in the sequence: " << nImages << endl << endl;
-
+    string ftrack = "FrameTrack.txt";
+    ofstream f;
+    f.open(ftrack.c_str());
+    f << fixed;
     // Main loop
     cv::Mat im;
     for(int ni=0; ni<nImages; ni++)
     {
         // Read image from file
-        im = cv::imread(string(argv[3])+"/"+vstrImageFilenames[ni],CV_LOAD_IMAGE_UNCHANGED);
+        im = cv::imread(vstrImageFilenames[ni],CV_LOAD_IMAGE_UNCHANGED);
         double tframe = vTimestamps[ni];
 
         if(im.empty())
         {
-            cerr << endl << "Failed to load image at: "
-                 << string(argv[3]) << "/" << vstrImageFilenames[ni] << endl;
+            cerr << endl << "Failed to load image at: " << vstrImageFilenames[ni] << endl;
             return 1;
         }
 
@@ -82,8 +85,24 @@ int main(int argc, char **argv)
 #endif
 
         // Pass the image to the SLAM system
-        SLAM.TrackMonocular(im,tframe);
+        cv::Mat T_track = SLAM.TrackMonocular(im,tframe); // Tcw
+        if(T_track.empty())//合法性检查
+        {
+            cerr << endl << "WARNING: Empty track pose at: "
+                 << ni << endl;
+            // return 1;
+        }
 
+        if(!T_track.empty())//合法性检查
+        {
+            // cv::Mat Ttrack = ORB_SLAM2::Converter::InverseMat(T_track.clone());//取逆得到 Twc
+            cv::Mat Rwc = T_track.rowRange(0,3).colRange(0,3).t();
+            cv::Mat twc = -Rwc*T_track.rowRange(0,3).col(3);
+            vector<float> q = ORB_SLAM2::Converter::toQuaternion(Rwc);
+
+            f << setprecision(6) << tframe << " " <<  setprecision(9) << twc.at<float>(0) << " " << twc.at<float>(1) << " " << twc.at<float>(2) << " " << q[0] << " " << q[1] << " " << q[2] << " " << q[3] << endl;
+        }
+        
 #ifdef COMPILEDWITHC11
         std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
 #else
@@ -104,7 +123,8 @@ int main(int argc, char **argv)
         if(ttrack<T)
             usleep((T-ttrack)*1e6);
     }
-
+    f.close();
+    // cout << endl << "trajectory saved!" << endl;
     // Stop all threads
     SLAM.Shutdown();
 
@@ -119,37 +139,53 @@ int main(int argc, char **argv)
     cout << "median tracking time: " << vTimesTrack[nImages/2] << endl;
     cout << "mean tracking time: " << totaltime/nImages << endl;
 
-    // Save camera trajectory
-    SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");
+    // Save camera trajectory // time x y z i j k w 注意格式
+    SLAM.SaveKeyFrameTrajectoryTUM("KeyFrameTrajectory.txt");  
+    // SLAM.SaveTrajectoryMonoTUM("FrameTrajectory.txt"); //也保存所有普通帧轨迹
+
+    // 保存点云到txt
+    string ptsfile = "office0_orb_mappts.txt";
+    SLAM.SaveMapPoints(ptsfile);
 
     return 0;
 }
 
-void LoadImages(const string &strFile, vector<string> &vstrImageFilenames, vector<double> &vTimestamps)
+// 更改接口来使用replica
+void LoadImages(const string &strPathToSequence, vector<string> &vstrImageFilenames, vector<double> &vTimestamps)
 {
-    ifstream f;
-    f.open(strFile.c_str());
-
-    // skip first three lines
-    string s0;
-    getline(f,s0);
-    getline(f,s0);
-    getline(f,s0);
-
-    while(!f.eof())
+    ifstream fTimes;
+    float fps = 10; // 生成伪时间 但要根据设置的帧率
+    float fidx = 0.0; // 初始id
+    cout << "pseudo time stamps: " << endl;
+    string strPathTimeFile = strPathToSequence + "/traj.txt"; // 用pose 文件 来查看帧数
+    fTimes.open(strPathTimeFile.c_str());
+    while(!fTimes.eof())
     {
         string s;
-        getline(f,s);
+        float t;
+        getline(fTimes,s);
         if(!s.empty())
         {
-            stringstream ss;
-            ss << s;
-            double t;
-            string sRGB;
-            ss >> t;
+            // stringstream ss;
+            // ss << s;
+            // double t;
+            // ss >> t;
+            t = fidx*1.0/fps;
             vTimestamps.push_back(t);
-            ss >> sRGB;
-            vstrImageFilenames.push_back(sRGB);
+            cout << "fid: "<<int(fidx)<<", "<<t<<endl;
+            fidx = fidx + 1.0;
         }
+    }
+
+    string strPrefixLeft = strPathToSequence + "/results/";
+
+    const int nTimes = vTimestamps.size();
+    vstrImageFilenames.resize(nTimes);
+
+    for(int i=0; i<nTimes; i++)
+    {
+        stringstream ss;
+        ss << setfill('0') << setw(6) << i; // dataset/Replica/office0/results/frame000202.jpg
+        vstrImageFilenames[i] = strPrefixLeft + "frame" + ss.str() + ".jpg";
     }
 }

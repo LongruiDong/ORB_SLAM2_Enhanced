@@ -230,7 +230,7 @@ void ViewerAR::Run()
         }
 
         pangolin::FinishFrame();
-        std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<size_t>(mT)));
+        usleep(mT*1000);
     }
 
 }

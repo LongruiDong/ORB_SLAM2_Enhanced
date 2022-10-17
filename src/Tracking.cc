@@ -43,17 +43,10 @@ using namespace std;
 namespace ORB_SLAM2
 {
 
-#ifdef FUNC_MAP_SAVE_LOAD
-Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor, bool bReuseMap):
-    mState(NO_IMAGES_YET), mSensor(sensor), mbOnlyTracking(false), mbVO(false), mpORBVocabulary(pVoc),
-    mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
-    mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mnLastRelocFrameId(0)
-#else
 Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer, MapDrawer *pMapDrawer, Map *pMap, KeyFrameDatabase* pKFDB, const string &strSettingPath, const int sensor):
     mState(NO_IMAGES_YET), mSensor(sensor), mbOnlyTracking(false), mbVO(false), mpORBVocabulary(pVoc),
     mpKeyFrameDB(pKFDB), mpInitializer(static_cast<Initializer*>(NULL)), mpSystem(pSys), mpViewer(NULL),
     mpFrameDrawer(pFrameDrawer), mpMapDrawer(pMapDrawer), mpMap(pMap), mnLastRelocFrameId(0)
-#endif
 {
     // Load camera parameters from settings file
 
@@ -89,6 +82,8 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
     if(fps==0)
         fps=30;
 
+    mseqlen = fSettings["Camera.lenth"];
+
     // Max/Min Frames to insert keyframes and to check relocalisation
     mMinFrames = 0;
     mMaxFrames = fps;
@@ -105,6 +100,7 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
     cout << "- p1: " << DistCoef.at<float>(2) << endl;
     cout << "- p2: " << DistCoef.at<float>(3) << endl;
     cout << "- fps: " << fps << endl;
+    cout << "- seq lenth: " << mseqlen << endl;
 
 
     int nRGB = fSettings["Camera.RGB"];
@@ -152,10 +148,6 @@ Tracking::Tracking(System *pSys, ORBVocabulary* pVoc, FrameDrawer *pFrameDrawer,
         else
             mDepthMapFactor = 1.0f/mDepthMapFactor;
     }
-#ifdef FUNC_MAP_SAVE_LOAD
-    if (bReuseMap)
-        mState = LOST;
-#endif
 
 }
 
@@ -508,8 +500,7 @@ void Tracking::Track()
     else
     {
         // This can happen if tracking is lost
-        if (!mlRelativeFramePoses.empty())
-            mlRelativeFramePoses.push_back(mlRelativeFramePoses.back());
+        mlRelativeFramePoses.push_back(mlRelativeFramePoses.back());
         mlpReferences.push_back(mlpReferences.back());
         mlFrameTimes.push_back(mlFrameTimes.back());
         mlbLost.push_back(mState==LOST);
@@ -642,6 +633,7 @@ void Tracking::MonocularInitialization()
             mCurrentFrame.SetPose(Tcw);
 
             CreateInitialMapMonocular();
+            cout<<"[debug] mono init at frame "<< mCurrentFrame.mnId << endl;
         }
     }
 }
@@ -1046,12 +1038,13 @@ bool Tracking::NeedNewKeyFrame()
     // Condition 2: Few tracked points compared to reference keyframe. Lots of visual odometry compared to map matches.
     const bool c2 = ((mnMatchesInliers<nRefMatches*thRefRatio|| bNeedToInsertClose) && mnMatchesInliers>15);
 
-    if((c1a||c1b||c1c)&&c2)
+    if( ((c1a||c1b||c1c)&&c2) || mCurrentFrame.mnId==mseqlen-1 ) // 最后一帧也是kf
     {
         // If the mapping accepts keyframes, insert keyframe.
         // Otherwise send a signal to interrupt BA
         if(bLocalMappingIdle)
         {
+            cout<<"frame "<<mCurrentFrame.mnId<<", true NeedKF"<<endl;
             return true;
         }
         else
@@ -1150,6 +1143,7 @@ void Tracking::CreateNewKeyFrame()
 
     mnLastKeyFrameId = mCurrentFrame.mnId;
     mpLastKeyFrame = pKF;
+    cout<<"frame "<<mCurrentFrame.mnId<<", become new KF "<<pKF->mnId<<endl;
 }
 
 void Tracking::SearchLocalPoints()
@@ -1521,9 +1515,7 @@ void Tracking::Reset()
     {
         mpViewer->RequestStop();
         while(!mpViewer->isStopped())
-        {
-            std::this_thread::sleep_for(std::chrono::microseconds(3000));
-        }
+            usleep(3000);
     }
 
     // Reset Local Mapping
