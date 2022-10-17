@@ -37,9 +37,9 @@ void LoadImages(const string &strSequence, vector<string> &vstrImageFilenames,
 
 int main(int argc, char **argv)
 {
-    if(argc != 4)
+    if(argc != 5)
     {   // ./mono_replica Vocabulary/ORBvoc.txt Examples/Monocular/Replica.yaml dataset/Replica/office0
-        cerr << endl << "Usage: ./mono_replica path_to_vocabulary path_to_settings path_to_sequence" << endl;
+        cerr << endl << "Usage: ./mono_replica path_to_vocabulary path_to_settings path_to_sequence [1|0](save map?)" << endl;
         return 1;
     }
 
@@ -51,7 +51,7 @@ int main(int argc, char **argv)
     int nImages = vstrImageFilenames.size();
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true);
+    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true,(bool)atoi(argv[4]));
 
     // Vector for tracking time statistics
     vector<float> vTimesTrack;
