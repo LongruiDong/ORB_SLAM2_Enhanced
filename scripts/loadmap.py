@@ -13,7 +13,11 @@ def read_map(mapbinfile):
     
     print("read map bin: {}".format(mapbinfile))
     
-    mapbin = open(mapbinfile, 'rb')
+    if '.bin' in mapbinfile:
+        mapbin = open(mapbinfile, 'rb')
+    else:
+        mapbin = open(mapbinfile)
+    
     
     print('1')
 

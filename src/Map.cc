@@ -158,32 +158,74 @@ void Map::GetMapPointsIdx()
     }
 }
 
+// 注意 又改成txt格式保存
 void Map::SaveMapPoint( ofstream& f, MapPoint* mp)
 {   
     //保存当前MapPoint的ID和世界坐标值
     // f.write((char*)&mp->mnId, sizeof(mp->mnId));
-    f.write((char*)&mmpnMapPointsIdx[mp], sizeof(mmpnMapPointsIdx[mp])); // 这样才能保证 和 下面关键点对应的地图点id是一致的吧
+    // f.write((char*)&mmpnMapPointsIdx[mp], sizeof(mmpnMapPointsIdx[mp])); // 这样才能保证 和 下面关键点对应的地图点id是一致的吧
     cv::Mat mpWorldPos = mp->GetWorldPos();
-    f.write((char*)& mpWorldPos.at<float>(0),sizeof(float));
-    f.write((char*)& mpWorldPos.at<float>(1),sizeof(float));
-    f.write((char*)& mpWorldPos.at<float>(2),sizeof(float));
+    // f.write((char*)& mpWorldPos.at<float>(0),sizeof(float));
+    // f.write((char*)& mpWorldPos.at<float>(1),sizeof(float));
+    // f.write((char*)& mpWorldPos.at<float>(2),sizeof(float));
+    unsigned long int gindx = mmpnMapPointsIdx[mp]; // global idx for 3d pts
+    string mpt_line = to_string(gindx) + " " + 
+        to_string(mpWorldPos.at<float>(0)) + " " + to_string(mpWorldPos.at<float>(1)) + " " + to_string(mpWorldPos.at<float>(2));
+    // 拿出该地图点的所有2d 观测
+    const map<KeyFrame*,size_t> observations = mp->GetObservations();
+    for(map<KeyFrame*,size_t>::const_iterator mit=observations.begin(), mend=observations.end(); mit!=mend; mit++)
+    {
+        KeyFrame* pKFi = mit->first;
+        if(!pKFi->isBad())
+        {
+            int frameid = (int) pKFi->mnFrameId;
+            // const cv::KeyPoint &kpUn = pKFi->mvKeysUn[mit->second];
+            int kptid = (int) mit->second; // 第 frameid 下内部 关键点id
+
+            mpt_line = mpt_line + " " + to_string(frameid) + " " + to_string(kptid);
+        }  
+    }
+    // 写入文件
+    f << mpt_line << endl;
 }
 
-void Map::SaveKeyFrame( ofstream &f, KeyFrame* kf )
+// 注意 又改成txt格式保存
+void Map::SaveKeyFrame( const string &dirname, KeyFrame* kf )
 {
     //保存当前关键帧的ID和时间戳
-    f.write((char*)&kf->mnId, sizeof(kf->mnId));
-    f.write((char*)&kf->mTimeStamp, sizeof(kf->mTimeStamp));
+    // f.write((char*)&kf->mnId, sizeof(kf->mnId));
+    // 以 当前帧frameid 命名
+    int frameid = (int) kf->mnFrameId;
+    stringstream ss;
+    ss << setw(4) << setfill('0') << frameid; // 4位数补0
+    string str;
+    ss >> str;
+    string kffilename = dirname + "/" + str + ".txt";
+    ofstream f;
+    f.open(kffilename.c_str(), ios_base::out);
+    cerr<<"KeyFrame Saving to "<< kffilename <<endl;
+    // f.write((char*)&kf->mTimeStamp, sizeof(kf->mTimeStamp));
+    float TimeStamp = (float) kf->mTimeStamp;
+    stringstream buf;
+    buf.precision(1);//覆盖默认精度
+	buf.setf(std::ios::fixed);//保留小数位
+    // buf << a << "文字";
+    buf << TimeStamp;
+    string timestr = buf.str(); // 1位小数的时间戳
     //保存当前关键帧的位姿矩阵 注意这里是Tcw! 和 pose 互逆
     cv::Mat Tcw = kf->GetPose();
+    string topline = timestr;
+    //保存平移矩阵
+    for ( int i = 0; i < 3; i ++ )
+        // f.write((char*)&Tcw.at<float>(i,3),sizeof(float));
+        topline = topline + " " + to_string((float) Tcw.at<float>(i,3));
+    topline = topline + " ";
     //通过四元数保存旋转矩阵
     std::vector<float> Quat = Converter::toQuaternion(Tcw);
     for ( int i = 0; i < 4; i ++ )
-        f.write((char*)&Quat[i],sizeof(float));
-    //保存平移矩阵
-    for ( int i = 0; i < 3; i ++ )
-        f.write((char*)&Tcw.at<float>(i,3),sizeof(float));
-
+        // f.write((char*)&Quat[i],sizeof(float));
+        topline = topline + " " + to_string((float) Quat[i]);
+    f << topline<< endl; // 即先保存了当前kf 的 tum 格式 Pose time x y z i j k w
 
     //直接保存旋转矩阵
     //  for ( int i = 0; i < Tcw.rows; i ++ )
@@ -194,47 +236,62 @@ void Map::SaveKeyFrame( ofstream &f, KeyFrame* kf )
     //          //cerr<<"Tcw.at<float>("<<i<<","<<j<<"):"<<Tcw.at<float>(i,j)<<endl;
     //      }
     //   }
- 
+    
+    string kpt_line; // kptid u v sdptid x y z
     //保存当前关键帧包含的ORB特征数目
     //cerr<<"kf->N:"<<kf->N<<endl;
-    f.write((char*)&kf->N, sizeof(kf->N));
+    // f.write((char*)&kf->N, sizeof(kf->N));
     //保存每一个ORB特征点
     for( int i = 0; i < kf->N; i ++ )
     {
-        cv::KeyPoint kp = kf->mvKeys[i];
-        f.write((char*)&kp.pt.x, sizeof(kp.pt.x));
-        f.write((char*)&kp.pt.y, sizeof(kp.pt.y));
-        f.write((char*)&kp.size, sizeof(kp.size));
-        f.write((char*)&kp.angle,sizeof(kp.angle));
-        f.write((char*)&kp.response, sizeof(kp.response));
-        f.write((char*)&kp.octave, sizeof(kp.octave));
+        cv::KeyPoint kp = kf->mvKeysUn[i];
+        kpt_line = to_string(i) + " " + to_string((float) kp.pt.x) + " " + to_string((float) kp.pt.y);
+        // f.write((char*)&kp.pt.x, sizeof(kp.pt.x));
+        // f.write((char*)&kp.pt.y, sizeof(kp.pt.y));
+        // f.write((char*)&kp.size, sizeof(kp.size));
+        // f.write((char*)&kp.angle,sizeof(kp.angle));
+        // f.write((char*)&kp.response, sizeof(kp.response));
+        // f.write((char*)&kp.octave, sizeof(kp.octave));
 
-        //保存当前特征点的描述符
-        for (int j = 0; j < kf->mDescriptors.cols; j ++ )
-            f.write((char*)&kf->mDescriptors.at<unsigned char>(i,j), sizeof(char));
+        // //保存当前特征点的描述符
+        // for (int j = 0; j < kf->mDescriptors.cols; j ++ )
+        //     f.write((char*)&kf->mDescriptors.at<unsigned char>(i,j), sizeof(char));
 
         //保存当前ORB特征对应的MapPoints的索引值
         unsigned long int mnIdx;
         MapPoint* mp = kf->GetMapPoint(i);
-        if (mp == NULL  )
-            mnIdx = ULONG_MAX;
-        else
+        if (mp != NULL  )
+        {
+            // mnIdx = ULONG_MAX;
+            cv::Mat mpWorldPos = mp->GetWorldPos();
             mnIdx = mmpnMapPointsIdx[mp];
-
-        f.write((char*)&mnIdx, sizeof(mnIdx));
+            kpt_line = kpt_line + " " + to_string(mnIdx) + " " + to_string(mpWorldPos.at<float>(0)) + " " + to_string(mpWorldPos.at<float>(1)) + " " + to_string(mpWorldPos.at<float>(2));
+        }  
+        else
+        {
+            // 还是需要打印 表示没有对应3d点
+            kpt_line = kpt_line + " -1 -1 -1 -1"; 
+        }
+            
+        // f.write((char*)&mnIdx, sizeof(mnIdx));
+        f << kpt_line << endl;
     }
+
+    f.close();
 }
 
-void Map::Save ( const string& filename )
+// 注意 又改成txt格式保存
+void Map::Save ( const string& dirname )
 {
-    cerr<<"Map Saving to "<<filename <<endl;
+    string mptfilename = dirname + "/mappts.txt";
+    cerr<<"Map points Saving to "<< mptfilename <<endl;
     ofstream f;
-    f.open(filename.c_str(), ios_base::out|ios::binary);
+    f.open(mptfilename.c_str(), ios_base::out);
     cerr << "The number of MapPoints is :"<<mspMapPoints.size()<<endl;
 
     //地图点的数目
     unsigned long int nMapPoints = mspMapPoints.size();
-    f.write((char*)&nMapPoints, sizeof(nMapPoints) );
+    // f.write((char*)&nMapPoints, sizeof(nMapPoints) );
 
     //获取每一个MapPoints的索引值，即从0开始计数，初始化了mmpnMapPointsIdx  
     GetMapPointsIdx(); 
@@ -242,37 +299,39 @@ void Map::Save ( const string& filename )
     //依次保存MapPoints
     for ( auto mp: mspMapPoints )
         SaveMapPoint( f, mp );
+    
+    f.close();
 
     cerr <<"The number of KeyFrames:"<<mspKeyFrames.size()<<endl;
     //关键帧的数目
     unsigned long int nKeyFrames = mspKeyFrames.size();
-    f.write((char*)&nKeyFrames, sizeof(nKeyFrames));
+    // f.write((char*)&nKeyFrames, sizeof(nKeyFrames));
 
     //依次保存关键帧KeyFrames
     for ( auto kf: mspKeyFrames )
-        SaveKeyFrame( f, kf );
+        SaveKeyFrame( dirname, kf );
 
-    for (auto kf:mspKeyFrames )
-    {
-        //获得当前关键帧的父节点，并保存父节点的ID
-        KeyFrame* parent = kf->GetParent();
-        unsigned long int parent_id = ULONG_MAX;
-        if ( parent )
-            parent_id = parent->mnId;
-        f.write((char*)&parent_id, sizeof(parent_id));
-        //获得当前关键帧的关联关键帧的大小，并依次保存每一个关联关键帧的ID和weight；
-        unsigned long int nb_con = kf->GetConnectedKeyFrames().size();
-        f.write((char*)&nb_con, sizeof(nb_con));
-        for ( auto ckf: kf->GetConnectedKeyFrames())
-        {
-            int weight = kf->GetWeight(ckf);
-            f.write((char*)&ckf->mnId, sizeof(ckf->mnId));
-            f.write((char*)&weight, sizeof(weight));
-        }
-    }
+    // for (auto kf:mspKeyFrames )
+    // {
+    //     //获得当前关键帧的父节点，并保存父节点的ID
+    //     KeyFrame* parent = kf->GetParent();
+    //     unsigned long int parent_id = ULONG_MAX;
+    //     if ( parent )
+    //         parent_id = parent->mnId;
+    //     f.write((char*)&parent_id, sizeof(parent_id));
+    //     //获得当前关键帧的关联关键帧的大小，并依次保存每一个关联关键帧的ID和weight；
+    //     unsigned long int nb_con = kf->GetConnectedKeyFrames().size();
+    //     f.write((char*)&nb_con, sizeof(nb_con));
+    //     for ( auto ckf: kf->GetConnectedKeyFrames())
+    //     {
+    //         int weight = kf->GetWeight(ckf);
+    //         f.write((char*)&ckf->mnId, sizeof(ckf->mnId));
+    //         f.write((char*)&weight, sizeof(weight));
+    //     }
+    // }
 
-    f.close();
-    cerr<<"Map Saving Finished!"<<endl;
+    // f.close();
+    cerr<<"all Map elements Saving Finished!"<<endl;
 }
 
 } //namespace ORB_SLAM

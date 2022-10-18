@@ -2,7 +2,7 @@ CMakeLists.txt.user
 Examples/Monocular/mono_euroc
 Examples/Monocular/mono_kitti
 Examples/Monocular/mono_tum
-Examples/Monocular/mono_replica
+
 Examples/Monocular/mono_replica_mapsl
 Examples/RGB-D/rgbd_tum
 Examples/ROS/ORB_SLAM2/CMakeLists.txt.user
@@ -24,6 +24,7 @@ Vocabulary/bin_vocabulary
 build/
 *~
 lib/
+Examples/Monocular/mono_replica
 # scripts
 dataset
 result

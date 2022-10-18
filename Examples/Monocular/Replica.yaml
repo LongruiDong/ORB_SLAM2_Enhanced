@@ -59,6 +59,6 @@ Viewer.ViewpointZ: -0.1
 Viewer.ViewpointF: 2000
 
 #--------------------------------------------------------------------------------------------
-# Map Parapeters SaveMapProxy 先试试bin 再试试txt
+# Map Parapeters SaveMapProxy 先试试bin 再试试txt result/map_proxy.txt
 #--------------------------------------------------------------------------------------------
-Map.mapfile: result/map_proxy.bin
+Map.mapfile: result

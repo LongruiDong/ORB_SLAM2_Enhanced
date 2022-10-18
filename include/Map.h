@@ -76,7 +76,7 @@ private:
     void serialize(Archive &ar, const unsigned int version);
 #endif
     // https://www.cnblogs.com/mafuqiang/p/6972342.html poine
-    void Save( const string &filename );
+    void Save( const string &dirname );
 
 protected:
     std::set<MapPoint*> mspMapPoints;
@@ -95,7 +95,7 @@ protected:
     std::map<MapPoint*, unsigned long int> mmpnMapPointsIdx;
     void GetMapPointsIdx();
     void SaveMapPoint( ofstream &f, MapPoint* mp );
-    void SaveKeyFrame( ofstream &f, KeyFrame* kf );
+    void SaveKeyFrame( const string &dirname, KeyFrame* kf );
 };
 
 } //namespace ORB_SLAM

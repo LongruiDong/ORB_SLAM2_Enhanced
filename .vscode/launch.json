@@ -12,7 +12,7 @@
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
-                "result/map_proxy.bin" // result/map_proxy.bin result_mapsl/map.bin
+                "result/map_proxy.txt" // result/map_proxy.bin result_mapsl/map.bin bin
                 
             ]
         }
