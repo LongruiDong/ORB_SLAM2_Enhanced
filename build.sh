@@ -27,7 +27,7 @@ echo "Configuring and building ORB_SLAM2 ..."
 
 mkdir build
 cd build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DUSE_MAP_SAVE_LOAD=1 # 是否编译此功能
+cmake .. -DCMAKE_BUILD_TYPE=Release -DUSE_MAP_SAVE_LOAD=0 # 是否编译此功能
 make -j20
 
 # # 搞一次就行

@@ -75,6 +75,11 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         mapfile = (string)mapfilen;
     }
 #endif
+    cv::FileNode mapfilen = fsSettings["Map.mapfile"];
+    if (!mapfilen.empty())
+    {
+        msmap_file = (string)mapfilen;
+    }
 
     //Load ORB Vocabulary
     cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
@@ -676,6 +681,13 @@ void System::SaveMapPoints(const string &filename)
     f.close();
     cout << endl << "Map Points saved! (txt)" << endl;
 
+}
+
+// https://www.cnblogs.com/mafuqiang/p/6972342.html poine
+
+void System::SaveMapProxy(const string &filename)  
+{  
+    mpMap->Save(filename);   
 }
 
 } //namespace ORB_SLAM

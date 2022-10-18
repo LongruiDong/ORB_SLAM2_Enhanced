@@ -143,6 +143,12 @@ private:
     bool LoadMap(const string &filename);
 #endif
 
+    // https://www.cnblogs.com/mafuqiang/p/6972342.html poine
+    // 用于在接口调用保存 这是更灵活的保存
+    void SaveMapProxy(const string &filename);
+
+    string msmap_file;
+
 private:
 
     // Input sensor

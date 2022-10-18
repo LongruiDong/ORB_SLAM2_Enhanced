@@ -75,6 +75,9 @@ private:
     template<class Archive>
     void serialize(Archive &ar, const unsigned int version);
 #endif
+    // https://www.cnblogs.com/mafuqiang/p/6972342.html poine
+    void Save( const string &filename );
+
 protected:
     std::set<MapPoint*> mspMapPoints;
     std::set<KeyFrame*> mspKeyFrames;
@@ -87,6 +90,12 @@ protected:
     int mnBigChangeIdx;
 
     std::mutex mMutexMap;
+    // https://www.cnblogs.com/mafuqiang/p/6972342.html poine
+    // 存储的是特征点对应的地图点的索引值
+    std::map<MapPoint*, unsigned long int> mmpnMapPointsIdx;
+    void GetMapPointsIdx();
+    void SaveMapPoint( ofstream &f, MapPoint* mp );
+    void SaveKeyFrame( ofstream &f, KeyFrame* kf );
 };
 
 } //namespace ORB_SLAM

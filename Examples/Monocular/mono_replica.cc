@@ -147,6 +147,10 @@ int main(int argc, char **argv)
     string ptsfile = "result/office0_orb_mappts.txt";
     SLAM.SaveMapPoints(ptsfile);
 
+    // https://blog.csdn.net/KYJL888/article/details/86743129 poine 此方式更灵活的保存
+    string mapfile = SLAM.msmap_file;
+    SLAM.SaveMapProxy(mapfile);
+
     return 0;
 }
 

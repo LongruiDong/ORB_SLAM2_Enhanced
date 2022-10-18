@@ -2,6 +2,8 @@
     "files.associations": {
         "*.log": "Log",
         "*.out": "log",
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "iosfwd": "cpp",
+        "*.tcc": "cpp"
     }
 }
