@@ -37,9 +37,9 @@ void LoadImages(const string &strSequence, vector<string> &vstrImageFilenames,
 
 int main(int argc, char **argv)
 {
-    if(argc != 4)
-    {   // ./mono_replica Vocabulary/ORBvoc.txt Examples/Monocular/Replica.yaml dataset/Replica/office0
-        cerr << endl << "Usage: ./mono_replica path_to_vocabulary path_to_settings path_to_sequence" << endl;
+    if(argc != 5)
+    {   // ./mono_replica Vocabulary/ORBvoc.txt Examples/Monocular/Replica.yaml dataset/Replica/office0 0/1
+        cerr << endl << "Usage: ./mono_replica path_to_vocabulary path_to_settings path_to_sequence vis(0|1)" << endl;
         return 1;
     }
 
@@ -49,9 +49,13 @@ int main(int argc, char **argv)
     LoadImages(string(argv[3]), vstrImageFilenames, vTimestamps);
 
     int nImages = vstrImageFilenames.size();
-
+    bool visflag = false;
+    if (stoi(argv[4]) == 1)
+    {
+        visflag = true;
+    }
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,true);
+    ORB_SLAM2::System SLAM(argv[1],argv[2],ORB_SLAM2::System::MONOCULAR,visflag);
 
     // Vector for tracking time statistics
     vector<float> vTimesTrack;
@@ -139,16 +143,17 @@ int main(int argc, char **argv)
     cout << "median tracking time: " << vTimesTrack[nImages/2] << endl;
     cout << "mean tracking time: " << totaltime/nImages << endl;
 
+    string mapfile = SLAM.msmap_file;
     // Save camera trajectory // time x y z i j k w 注意格式
-    SLAM.SaveKeyFrameTrajectoryTUM("result/KeyFrameTrajectory.txt");  
+    SLAM.SaveKeyFrameTrajectoryTUM(mapfile+"/KeyFrameTrajectory.txt");  
     // SLAM.SaveTrajectoryMonoTUM("FrameTrajectory.txt"); //也保存所有普通帧轨迹
 
     // 保存点云到txt
-    string ptsfile = "result/office0_orb_mappts.txt";
-    SLAM.SaveMapPoints(ptsfile);
+    string ptsfile = "/office0_orb_mappts.txt";
+    SLAM.SaveMapPoints(mapfile+ptsfile);
 
     // https://blog.csdn.net/KYJL888/article/details/86743129 poine 此方式更灵活的保存
-    string mapfile = SLAM.msmap_file;
+    
     SLAM.SaveMapProxy(mapfile);
 
     return 0;
@@ -163,6 +168,7 @@ void LoadImages(const string &strPathToSequence, vector<string> &vstrImageFilena
     // cout << "pseudo time stamps: " << endl;
     string strPathTimeFile = strPathToSequence + "/traj.txt"; // 用pose 文件 来查看帧数
     fTimes.open(strPathTimeFile.c_str());
+    int count = 0;
     while(!fTimes.eof())
     {
         string s;
@@ -178,6 +184,11 @@ void LoadImages(const string &strPathToSequence, vector<string> &vstrImageFilena
             vTimestamps.push_back(t);
             // cout << "fid: "<<int(fidx)<<", "<<t<<endl;
             fidx = fidx + 1.0;
+            count++;
+            // if (count>50)
+            // {
+            //     break;
+            // }
         }
     }
 

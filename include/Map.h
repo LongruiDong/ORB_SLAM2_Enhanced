@@ -20,7 +20,7 @@
 
 #ifndef MAP_H
 #define MAP_H
-
+#include "Converter.h"
 #include "MapPoint.h"
 #include "KeyFrame.h"
 #include <set>
@@ -96,6 +96,10 @@ protected:
     void GetMapPointsIdx();
     void SaveMapPoint( ofstream &f, MapPoint* mp );
     void SaveKeyFrame( const string &dirname, KeyFrame* kf );
+
+    Eigen::Vector2d project_2d(const Eigen::Vector3d& v);
+    Eigen::Vector2d camproject(const Eigen::Vector3d &trans_xyz, const float& fx,
+                            const float& fy, const float& cx, const float& cy);
 };
 
 } //namespace ORB_SLAM

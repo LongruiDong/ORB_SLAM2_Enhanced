@@ -20,7 +20,8 @@
 
 #ifndef CONVERTER_H
 #define CONVERTER_H
-
+#include <sys/stat.h> //关于建立文件夹
+#include <sys/types.h> 
 #include<opencv2/core/core.hpp>
 
 #include<Eigen/Dense>

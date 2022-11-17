@@ -24,6 +24,8 @@
 #include<unistd.h> //https://github.com/raulmur/ORB_SLAM2/issues/954#issuecomment-728666638
 #include<string>
 #include<thread>
+#include <sys/stat.h> //关于建立文件夹
+#include <sys/types.h> 
 #include<opencv2/core/core.hpp>
 
 #include "Tracking.h"
@@ -146,8 +148,10 @@ private:
     // https://www.cnblogs.com/mafuqiang/p/6972342.html poine
     // 用于在接口调用保存 这是更灵活的保存
     void SaveMapProxy(const string &filename);
-
+    // 所有输出所在路径dir 需要建立的
     string msmap_file;
+    static bool createpDirs(int* p_err_cd, char *mkdir_path);
+    int mseqlen; //增加序列总帧数
 
 private:
 

@@ -4,6 +4,9 @@
         "*.out": "log",
         "iostream": "cpp",
         "iosfwd": "cpp",
-        "*.tcc": "cpp"
+        "*.tcc": "cpp",
+        "string": "cpp",
+        "core": "cpp",
+        "ostream": "cpp"
     }
 }

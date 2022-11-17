@@ -22,11 +22,14 @@ Thirdparty/g2o/lib/
 Vocabulary/ORBvoc.txt
 Vocabulary/bin_vocabulary
 build/
+.vscode
 *~
+*.txt
 lib/
 Examples/Monocular/mono_replica
 # scripts
 dataset
 result
 result_mapsl
+log
 
