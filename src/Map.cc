@@ -20,6 +20,7 @@
 
 #include "Map.h"
 #include "Converter.h"
+#include "System.h"
 
 #include<mutex>
 
@@ -158,6 +159,26 @@ void Map::GetMapPointsIdx()
     }
 }
 
+Eigen::Vector2d Map::project_2d(const Eigen::Vector3d& v)
+{
+    // cout<<"in project2d"<<endl; // ok
+    Eigen::Vector2d res;
+    res(0) = v(0)/v(2);
+    res(1) = v(1)/v(2);
+    return res;
+}
+
+Eigen::Vector2d Map::camproject(const Eigen::Vector3d &trans_xyz, const float& fx,
+                            const float& fy, const float& cx, const float& cy)
+{
+    // cout<<"in cam_project"<<endl;
+    Eigen::Vector2d proj = project_2d(trans_xyz);
+    Eigen::Vector2d res;
+    res[0] = proj[0]*fx + cx;
+    res[1] = proj[1]*fy + cy;
+    // cout<<"done cam_project"<<endl; //ok
+}
+
 // 注意 又改成txt格式保存
 void Map::SaveMapPoint( ofstream& f, MapPoint* mp)
 {   
@@ -168,23 +189,53 @@ void Map::SaveMapPoint( ofstream& f, MapPoint* mp)
     // f.write((char*)& mpWorldPos.at<float>(0),sizeof(float));
     // f.write((char*)& mpWorldPos.at<float>(1),sizeof(float));
     // f.write((char*)& mpWorldPos.at<float>(2),sizeof(float));
+    // 转vector3d
+    Eigen::Vector3d vworld = Converter::toVector3d(mpWorldPos);
+    // cout<<"debug vworld"<<endl; // ok
     unsigned long int gindx = mmpnMapPointsIdx[mp]; // global idx for 3d pts
     string mpt_line = to_string(gindx) + " " + 
         to_string(mpWorldPos.at<float>(0)) + " " + to_string(mpWorldPos.at<float>(1)) + " " + to_string(mpWorldPos.at<float>(2));
     // 拿出该地图点的所有2d 观测
     const map<KeyFrame*,size_t> observations = mp->GetObservations();
+    // 保存此地图点 在所有观测上的总投影误差
+    float error_sum = 0.;
     for(map<KeyFrame*,size_t>::const_iterator mit=observations.begin(), mend=observations.end(); mit!=mend; mit++)
     {
         KeyFrame* pKFi = mit->first;
+        float fx = pKFi->fx;
+        float fy = pKFi->fy;
+        float cx = pKFi->cx;
+        float cy = pKFi->cy;
         if(!pKFi->isBad())
         {
             int frameid = (int) pKFi->mnFrameId;
-            // const cv::KeyPoint &kpUn = pKFi->mvKeysUn[mit->second];
+            const cv::KeyPoint &kpUn = pKFi->mvKeysUn[mit->second];
             int kptid = (int) mit->second; // 第 frameid 下内部 关键点id
 
             mpt_line = mpt_line + " " + to_string(frameid) + " " + to_string(kptid);
+            // cout<<"begin"<<endl;
+            Eigen::Matrix<double,2,1> obs;
+            obs << kpUn.pt.x, kpUn.pt.y;
+            cv::Mat Tcw = pKFi->GetPose(); //当前kf位姿 Tcw
+            g2o::SE3Quat SE_cw = Converter::toSE3Quat(Tcw); //转为g2o格式 方便投影算误差
+            // cout<<"to v_cam"<<endl; // ok
+            Eigen::Vector3d vcam = SE_cw.map(vworld);
+            // cout<<"to x2d"<<endl; // ok
+            Eigen::Vector2d proj;
+            proj(0) = vcam(0)/vcam(2);
+            proj(1) = vcam(1)/vcam(2);
+            Eigen::Vector2d res;
+            res[0] = proj[0]*fx + cx;
+            res[1] = proj[1]*fy + cy;
+            // Eigen::Vector2d x2d = camproject(vcam, pKFi->fx, pKFi->fy, pKFi->cx, pKFi->cy);
+            // cout<<"to error_v"<<endl; 
+            Eigen::Vector2d error_v = obs - res;
+            // cout<<"to error_sum"<<endl; // 上面这句
+            error_sum = error_sum + error_v.norm(); // 累加重投影误差
+            // cout<<"[debug error_sum]"<<endl;
         }  
     }
+    mpt_line = mpt_line + " " + to_string(error_sum); //每行最后一维是当前3d点的总投影误差
     // 写入文件
     f << mpt_line << endl;
 }
@@ -203,7 +254,7 @@ void Map::SaveKeyFrame( const string &dirname, KeyFrame* kf )
     string kffilename = dirname + "/" + str + ".txt";
     ofstream f;
     f.open(kffilename.c_str(), ios_base::out);
-    cerr<<"KeyFrame Saving to "<< kffilename <<endl;
+    // cerr<<"KeyFrame Saving to "<< kffilename <<endl;
     // f.write((char*)&kf->mTimeStamp, sizeof(kf->mTimeStamp));
     float TimeStamp = (float) kf->mTimeStamp;
     stringstream buf;
@@ -283,6 +334,19 @@ void Map::SaveKeyFrame( const string &dirname, KeyFrame* kf )
 // 注意 又改成txt格式保存
 void Map::Save ( const string& dirname )
 {
+    string kptdir = dirname + "/keypt";
+    //建立输出关键帧2d点的文件夹
+    // int ret = mkdir(kptdir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    // if (!ret)
+    // {
+    //     cout<<"create output dir: "<<kptdir<<endl;
+    // }
+    // else
+    // {
+    //     cout<<"failed to create outputdir: "<<kptdir<<endl;
+    // }
+    // int error = 0;
+    // bool dirflag = System::createpDirs(&error,  (char *)kptdir.c_str());
     string mptfilename = dirname + "/mappts.txt";
     cerr<<"Map points Saving to "<< mptfilename <<endl;
     ofstream f;
@@ -298,7 +362,9 @@ void Map::Save ( const string& dirname )
 
     //依次保存MapPoints
     for ( auto mp: mspMapPoints )
+    {
         SaveMapPoint( f, mp );
+    }
     
     f.close();
 
@@ -309,7 +375,7 @@ void Map::Save ( const string& dirname )
 
     //依次保存关键帧KeyFrames
     for ( auto kf: mspKeyFrames )
-        SaveKeyFrame( dirname, kf );
+        SaveKeyFrame( kptdir, kf );
 
     // for (auto kf:mspKeyFrames )
     // {

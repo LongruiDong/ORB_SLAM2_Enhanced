@@ -1189,7 +1189,7 @@ void Tracking::CreateNewKeyFrame()
 
     mnLastKeyFrameId = mCurrentFrame.mnId;
     mpLastKeyFrame = pKF;
-    cout<<"frame "<<mCurrentFrame.mnId<<", become new KF "<<pKF->mnId<<endl;
+    // cout<<"frame "<<mCurrentFrame.mnId<<", become new KF "<<pKF->mnId<<endl;
 }
 
 void Tracking::SearchLocalPoints()

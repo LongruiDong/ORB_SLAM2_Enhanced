@@ -25,6 +25,7 @@
 #include <thread>
 #include <pangolin/pangolin.h>
 #include <iomanip>
+#include <errno.h>
 
 static bool has_suffix(const std::string &str, const std::string &suffix)
 {
@@ -81,6 +82,19 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         msmap_file = (string)mapfilen;
     }
 
+    //建立输出文件夹
+    // int ret = mkdir(msmap_file.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    // if (!ret)
+    // {
+    //     cout<<"create output dir: "<<msmap_file<<endl;
+    // }
+    // else
+    // {
+    //     cout<<"failed to create outputdir: "<<msmap_file<<endl;
+    // }
+    // int error = 0;
+    // bool dirflag = createpDirs(&error,  (char *)msmap_file.c_str());
+    
     //Load ORB Vocabulary
     cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
 
@@ -133,6 +147,8 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
                              mpMap, mpKeyFrameDatabase, strSettingsFile, mSensor);
 #endif
 
+    // 把序列长度 赋值给system
+    mseqlen = mpTracker->mseqlen;
     //Initialize the Local Mapping thread and launch
     mpLocalMapper = new LocalMapping(mpMap, mSensor==MONOCULAR);
     mptLocalMapping = new thread(&ORB_SLAM2::LocalMapping::Run,mpLocalMapper);
@@ -688,6 +704,70 @@ void System::SaveMapPoints(const string &filename)
 void System::SaveMapProxy(const string &filename)  
 {  
     mpMap->Save(filename);   
+}
+
+bool System::createpDirs(int* p_err_cd, char *mkdir_path)
+{
+    char tmp_buf[2000+1];
+    char tmp_dir[2000+1];
+    char *p_tmp = NULL ,*p_tmp1 = NULL;
+    int n_ret = 0;
+    mode_t old_mask;
+    
+    memset(tmp_buf,0,sizeof(tmp_buf));
+    memset(tmp_dir,0,sizeof(tmp_dir));
+
+    if(strlen(mkdir_path) > 2000 )
+    {
+        *p_err_cd = 1000;
+        return -1;
+    }
+    strcat(tmp_buf,"/");
+
+    p_tmp1 = mkdir_path;
+    while(1)
+    {
+        if(p_tmp1[0] =='\0')
+            return 0;
+        p_tmp = strchr(p_tmp1,'/');
+        if(p_tmp == NULL)
+        {
+            strcat(tmp_buf,p_tmp1);
+            old_mask = umask(0);
+            n_ret=mkdir(tmp_buf, S_IRWXU | S_IRWXG | S_IRWXO);
+            umask(old_mask);
+            if(n_ret!=0 && errno!= EEXIST)
+            {
+                *p_err_cd = 3000 + errno;
+                return -1;
+            }
+            break;
+        }
+        else if(p_tmp == p_tmp1 )
+        {
+            p_tmp1++;
+            continue;
+        }
+        memset(tmp_dir,0x00,sizeof(tmp_dir));
+        memcpy(tmp_dir,p_tmp1,p_tmp-p_tmp1+1);
+        strcat(tmp_buf,tmp_dir);
+        /*
+         *mkdir(path, mode)设置目录权限时，需要调用umask(cmode)函数
+         *最终权限值：mode&(~cmode)，即mode与(cmode取反)
+         */
+        old_mask = umask(0);
+        n_ret=mkdir(tmp_buf, S_IRWXU | S_IRWXG | S_IRWXO);
+        umask(old_mask);
+        
+        if(n_ret!=0 && errno!= EEXIST)
+        {
+            *p_err_cd = 3000 + errno;
+            return -1;
+        }
+        p_tmp1 = p_tmp++;
+    }
+
+    return 0;
 }
 
 } //namespace ORB_SLAM
